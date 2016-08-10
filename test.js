@@ -1,7 +1,7 @@
 var Slack = require('slack-node');
 var PokemonGO = require('./poke.io.js');
 var socket = require('socket.io-client')('http://localhost:3001');
-webhookUri = "https://hooks.slack.com/services/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";
+webhookUri = "";
 
 var a = new PokemonGO.Pokeio();
 slack = new Slack();
