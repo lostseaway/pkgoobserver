@@ -1,0 +1,199 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Socket.IO chat</title>
+  </head>
+  <body>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="http://code.jquery.com/jquery-1.11.1.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+	<script>
+
+      var json = {}
+      var inMap = {}
+      var inGyms = []
+      var inStop = {}
+  		var socket = io();
+      var sync = 0;
+      var teamImage = { 1 : "https://jackaloupe.files.wordpress.com/2016/07/team-mystic-cutout1.png" , 2 : "https://jackaloupe.files.wordpress.com/2016/07/team-valor-cutout1.png" , 3 : "https://cdn.joejiko.com/img/gaming/pokemon/team-instinct-vector.svg"}
+      var pokeStopName = {"d4d17ae9cc2b4b7e95cf84f07a0c4eca.11" : "Voice of Wind" , "77f731390077466fa267d5fce030e783.16" : "Nature Drive"}
+      socket.on('connect', function() {
+        socket.emit('getLocation',{});
+      });
+
+      socket.on('nearby', function(msg){
+        if(sync == 0){
+          sync = 1
+          var pokemon = msg.pokemon
+          
+          pokemon.forEach(function(poke){
+            updateWild(poke);
+          })
+
+          var gyms = msg.gyms
+          gyms.forEach(function(gym){
+            updateGym(gym)
+          })
+
+          var pokestop = msg.pokestops
+          pokestop.forEach(function(stop){
+            if(parseFloat(stop.latitude) <= 13.743334 && parseFloat(stop.latitude) >=13.742354 && parseFloat(stop.longitude) >= 100.547344 && parseFloat(stop.longitude) <= 100.548709){
+              if(pokeStopName[stop.pokestop_id] != null){
+
+                if(inStop[stop.pokestop_id] == null) {
+                  inStop[stop.pokestop_id] = stop
+                    var out = "<div class = \"col-md-6\" id=\""+stop.pokestop_id.split(".")[0]+"\" style=\"padding:5px\">"
+                      out += "<div class=\"col-md-6\">Name : "+pokeStopName[stop.pokestop_id]+"</div>"
+                      out += "<div class=\"col-md-3 guard\">"
+                      if(stop.active_pokemon_id != null){
+                          var pokemon = json.pokemon[stop.active_pokemon_id-1]
+                          out += "<img src=\""+pokemon.img+"\" style=\"width:75px\">"
+                      }
+                      out += "</div>"
+                      var lure = true
+                      if(stop.lure_expiration == 0) lure = false
+                      out += "<div class=\"col-md-6 lure\">Lure Module : "+lure+"</div>"
+                      out += "</div>"
+                  $("#pkstop").append(out)
+                }
+                else{
+                  if(stop.active_pokemon_id != inStop[stop.pokestop_id].active_pokemon_id){
+                    console.log("IN")
+                    if(stop.active_pokemon_id != null){
+                      var pokemon = json.pokemon[stop.active_pokemon_id-1]
+                      $("#"+stop.pokestop_id.split(".")[0]+" .guard").html("<img src=\""+pokemon.img+"\" style=\"width:75px\">")
+                    }else{
+                      $("#"+stop.pokestop_id.split(".")[0]+" .guard").html("")
+                    }
+                  }
+                  var lure = true
+                  if(stop.lure_expiration == 0) lure = false
+                  $("#"+stop.pokestop_id.split(".")[0]+" .lure").html("Lure Module : "+lure)
+
+                  inStop[stop.pokestop_id] = stop
+                }
+
+              }
+            }
+          })
+          sync = 0
+        }
+      });
+
+      socket.on('bLocation', function(msg){
+        $("#location_name").text("Name : "+msg.name);
+        $("#location_lat").text("Lat : "+msg.lat);
+        $("#location_lng").text("Lng : "+msg.lng);
+      })
+
+      socket.on('bGyms',function(msg){
+        msg.gyms.forEach(function(gym){
+          if(gym != null){
+            var out = "<div class = \"row\" id=\""+gym.fort_id.split(".")[0]+"\" style=\"padding:5px\"><div class=\"col-md-3\">"
+            out += "<img src=\""+gym.image_urls[0]+"\" style=\"width:100px\"></div>"
+            out += "<div class=\"col-md-6\">Name : "+gym.name+"</div>"
+            out += "<div class=\"col-md-6 team\"></div>"
+            out += "<div class=\"col-md-3 guard\"></div>"
+            out += "</div>"
+            $("#gyms").append(out)
+          }
+        })
+      })
+
+  $(function(){
+    $('#button').click(function(){
+      socket.emit('chat message', $('#m').val());
+      $('#m').val('');
+    })
+    $.getJSON("json", function(jt) {
+      json = jt
+    });
+  })
+
+  function updateWild(msg){
+    if(inMap[msg.SpawnPointId] == null ){
+      var pokemon = json.pokemon[msg.PokedexTypeId-1]
+      var out = "<div class = \"row\" id=\""+msg.SpawnPointId+"\" ><div class=\"col-md-4\">"
+      out += "<img src=\""+pokemon.img+"\"></div>"
+      out += "<div class=\"col-md-8\">Name : "+pokemon.name+"</div>"
+      out += "</div>"
+      $("#wild").append(out)
+    }
+    else{
+      $("#30e29edc585 .time").text("TimeMS : "+msg.TimeTillHiddenMs)
+    }
+    inMap[msg.SpawnPointId] = 1
+  }
+
+  function updateGym(msg){
+    if(msg.guard_pokemon_id != null) {
+      var pokemon = json.pokemon[msg.guard_pokemon_id-1]
+      $("#"+msg.gym_id.split(".")[0]+" .team").html("<img src=\""+teamImage[msg.team_id]+"\" style=\"width:75px\">")
+      $("#"+msg.gym_id.split(".")[0]+" .guard").html("<img src=\""+pokemon.img+"\" style=\"width:75px\">")
+    }else{
+      $("#"+msg.gym_id.split(".")[0]+" .team").html("Free!!!")
+      $("#"+msg.gym_id.split(".")[0]+" .guard").html("")
+    }
+  }
+	</script>
+  <nav class="navbar navbar-default">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <a class="navbar-brand" href="#">
+      </a>
+    </div>
+  </div>
+</nav>
+  <div class="container">
+
+      <div class="col-md-12">
+        <div class="panel panel-default">
+          <div class="panel-heading">PkStop</div>
+          <div class="panel-body" id = "pkstop">
+
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="panel panel-default">
+          <div class="panel-heading">WildPokemon</div>
+          <div class="panel-body" id = "wild">
+
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="panel panel-default">
+          <div class="panel-heading">Gyms</div>
+          <div class="panel-body" id = "gyms">
+
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="panel panel-default">
+          <div class="panel-heading">Location Profile</div>
+          <div class="panel-body">
+            <h4 id = "location_name">Name : </h4>
+            <h4 id = "location_lat">Lat : </h4>
+            <h4 id = "location_lng">Long : </h4>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="panel panel-default">
+          <div class="panel-heading">PokeStop</div>
+          <div class="panel-body" id = "">
+
+          </div>
+        </div>
+      </div>
+
+
+    </div>
+</html>
